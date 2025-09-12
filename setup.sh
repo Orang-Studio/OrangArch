@@ -296,7 +296,115 @@ genfstab -U "$ROOT_MNT" >> "$ROOT_MNT/etc/fstab"
 
 # --------------- chroot config ---------------
 emit_status 70 "Entering chroot for system configuration"
+
 ROOT_UUID=$(blkid -s UUID -o value "$P_ROOT")
+export ROOT_UUID
+
+# swapfile only on ext4/xfs (skip on btrfs here)
+DO_SWAPFILE=0
+if [[ "$SWAP_KIND" == "file" && "$SWAP_MIB" != "0" ]]; then
+  if [[ "$FS" == "btrfs" ]]; then
+    warn "Swapfile on btrfs skipped (use swap partition instead)."
+  else
+    DO_SWAPFILE=1
+  fi
+fi
+
+DM=""
+case "$PROFILE" in
+  xfce) DM="lightdm" ;;
+  kde)  DM="sddm" ;;
+  gnome)DM="gdm" ;;
+esac
+
+KCL=""
+if [[ "$ENCRYPT" == "yes" ]]; then
+  LUKS_UUID="$ROOT_UUID"
+  KCL="cryptdevice=UUID=$LUKS_UUID:cryptroot root=/dev/mapper/cryptroot"
+fi
+
+arch-chroot "$ROOT_MNT" /bin/bash <<CHROOT
+set -euo pipefail
+
+echo "==> [70%] Timezone & clock"
+ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
+hwclock --systohc || true
+
+echo "==> [72%] Locale"
+sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
+locale-gen
+echo 'LANG=en_US.UTF-8' > /etc/locale.conf
+
+echo "==> [74%] Hostname & hosts"
+echo "$HOSTNAME" > /etc/hostname
+cat >/etc/hosts <<EOF
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   $HOSTNAME.localdomain $HOSTNAME
+EOF
+
+echo "==> [76%] Users & sudo"
+echo "root:$PASS_ROOT" | chpasswd
+useradd -m -G wheel -s /bin/bash "$USERNAME"
+echo "$USERNAME:$PASS_USER" | chpasswd
+sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
+
+echo "==> [78%] Enable services"
+systemctl enable NetworkManager
+if [[ -n "$DM" ]]; then systemctl enable "$DM"; fi
+
+# mkinitcpio hooks for LUKS
+if [[ "$ENCRYPT" == "yes" ]]; then
+  echo "==> [80%] Rebuilding initramfs with LUKS hooks"
+  sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block encrypt filesystems fsck)/' /etc/mkinitcpio.conf || true
+  mkinitcpio -P
+fi
+
+# Bootloader
+echo "==> [85%] Installing bootloader: $BOOTLOADER"
+if [[ "$BOOTLOADER" == "systemd-boot" ]]; then
+  bootctl install
+  mkdir -p /boot/loader/entries
+  cat >/boot/loader/loader.conf <<EOF2
+default arch.conf
+timeout 5
+console-mode max
+editor no
+EOF2
+
+  UCODE=""
+  if pacman -Q intel-ucode >/dev/null 2>&1; then UCODE="initrd  /intel-ucode.img"; fi
+  if pacman -Q amd-ucode   >/dev/null 2>&1; then UCODE="initrd  /amd-ucode.img"; fi
+
+  cat >/boot/loader/entries/arch.conf <<EOF3
+title   Arch Linux
+linux   /vmlinuz-linux
+$UCODE
+initrd  /initramfs-linux.img
+options root=UUID=$ROOT_UUID rw
+EOF3
+
+else
+  pacman -Sy --noconfirm --needed grub efibootmgr
+  grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id="Arch" --recheck
+  if [[ "$ENCRYPT" == "yes" ]]; then
+    sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="'"$KCL"'"/' /etc/default/grub
+  fi
+  grub-mkconfig -o /boot/grub/grub.cfg
+fi
+
+# Swapfile (ext4/xfs only)
+if [[ "$DO_SWAPFILE" -eq 1 ]]; then
+  echo "==> [90%] Creating swapfile"
+  fallocate -l ${SWAP_MIB}M /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  echo "/swapfile none swap defaults 0 0" >> /etc/fstab
+fi
+
+echo "==> [95%] Chroot configuration complete"
+CHROOT
+
 
 # swapfile only on ext4/xfs (skip on btrfs here)
 DO_SWAPFILE=0
