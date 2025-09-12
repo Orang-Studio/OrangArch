@@ -35,7 +35,7 @@ An **automated Arch Linux installer** with a dialog-based "GUI", optional **LUKS
 Run directly from the **Arch ISO**:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/InterJava-Studio/autounentended-arch/main/arch-gui-installer.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/InterJava-Studio/autounentended-arch/main/setup.sh)
 ````
 
 Or clone manually:
