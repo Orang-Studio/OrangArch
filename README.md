@@ -1,15 +1,15 @@
 
-# Arch GUI Installer 🐍
+# Arch GUI Installer
 
 An **automated Arch Linux installer** with a dialog-based "GUI", optional **LUKS encryption**, **desktop environments**, **swap choices**, **bootloader selection (systemd-boot or GRUB)**, and even a little **Snake game** to play while your system installs.
 
-⚡ Built for the official [Arch Linux ISO](https://archlinux.org/download/).  
-🎮 Safe: if Snake fails, the install continues.  
-🛠️ Resilient: retries downloads, refreshes mirrors if needed, supports a **Best-Effort mode** to keep going on non-critical errors.
+Built for the official [Arch Linux ISO](https://archlinux.org/download/).  
+Safe: if Snake fails, the install continues.  
+Resilient: retries downloads, refreshes mirrors if needed, supports a **Best-Effort mode** to keep going on non-critical errors.
 
 ---
 
-## ✨ Features
+## Features
 
 - **Interactive TUI** with [dialog](https://invisible-island.net/dialog/)  
 - **Disk setup**: EFI + swap (partition/file) + root  
@@ -30,26 +30,15 @@ An **automated Arch Linux installer** with a dialog-based "GUI", optional **LUKS
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 Run directly from the **Arch ISO**:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/InterJava-Studio/autounentended-arch/main/setup.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Orang-Studio/OrangArch/main/setup.sh)
 ````
 
-Or clone manually:
-
-```bash
-git clone https://github.com/InterJava-Studio/autounentended-arch/.git
-cd <your-repo>
-chmod +x arch-gui-installer.sh
-./arch-gui-installer.sh
-```
-
----
-
-## 📋 Requirements
+## Requirements
 
 * **UEFI system** (script assumes UEFI boot)
 * **Internet connection** (for pacstrap + package downloads)
@@ -60,7 +49,7 @@ The script installs needed tools (`dialog`, `tmux`, `python`, `parted`) if missi
 
 ---
 
-## 🖥️ Options Explained
+## Options Explained
 
 * **Filesystem**: choose what to format root with (`ext4`, `btrfs`, or `xfs`)
 * **Encryption**: optional LUKS (root password reused as passphrase by default)
@@ -81,7 +70,7 @@ The script installs needed tools (`dialog`, `tmux`, `python`, `parted`) if missi
 
 ---
 
-## 🎮 Snake Mode
+## Snake Mode
 
 During installation, the script launches `tmux` with two panes:
 
@@ -97,7 +86,7 @@ tmux attach -t archinst
 
 ---
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 * This script will **erase the target disk** you select.
 * While it has some safety checks and retries, **no installer is 100% error-proof**.
@@ -106,7 +95,7 @@ tmux attach -t archinst
 
 ---
 
-## 📜 License
+## License
 
 [MIT License](./LICENSE) — do whatever you want, but no warranty is provided.
 
