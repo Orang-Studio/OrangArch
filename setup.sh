@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-# Arch GUI Installer with Snake HUD + UEFI/BIOS autodetect
-# MIT License
-
+# Arch GUI Installer with Snake HUD
 set -euo pipefail
 VERSION="1.6.0"
 
-# ---------------- helpers ----------------
 die(){ echo "[ERROR] $*" >&2; exit 1; }
 warn(){ echo "[WARN]  $*" >&2; }
 info(){ echo "[INFO]  $*"; }
@@ -16,7 +13,6 @@ devpart(){ local d="$1" i="$2"; [[ "$d" =~ (nvme|mmcblk) ]] && echo "${d}p${i}" 
 mem_mib(){ awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo; }
 retry(){ local t="${1:-3}"; shift; local n=0; until "$@"; do n=$((n+1)); ((n>=t)) && return 1; sleep $((n*3)); done; }
 
-# ---------------- preflight ----------------
 need_root
 for p in dialog tmux python parted; do cmd "$p" || pacman -Sy --noconfirm --needed "$p"; done
 
@@ -30,7 +26,6 @@ emit_status(){ local pct="$1"; shift; local msg="$*"; printf '{"percent":%d,"ste
 
 title="Arch GUI Installer v$VERSION ($FIRMWARE)"
 
-# ---------------- dialogs ----------------
 mapfile -t DISKS < <(lsblk -dno NAME,SIZE,TYPE | awk '$3=="disk"{print "/dev/"$1" "$2}')
 ((${#DISKS[@]})) || die "No disks found."
 disk_items=(); for l in "${DISKS[@]}"; do disk_items+=("$(awk '{print $1}'<<<"$l")" "$(awk '{print $2}'<<<"$l")"); done
@@ -38,7 +33,6 @@ DISK=$(dialog --stdout --no-tags --title "$title" --menu "Select target disk (ER
 
 FS=$(dialog --stdout --title "$title" --menu "Root filesystem" 12 60 3 ext4 "Reliable" btrfs "Snapshots (@/@home)" xfs "Fast") || exit 1
 
-# Bootloader choice: only when UEFI (BIOS forces GRUB)
 if [[ "$FIRMWARE" == "uefi" ]]; then
   BOOTLOADER=$(dialog --stdout --title "$title" --menu "Bootloader (UEFI)" 12 60 2 systemd-boot "Simple" grub "GRUB") || exit 1
 else
@@ -71,7 +65,6 @@ PASS_USER2=$(dialog --stdout --insecure --title "$title" --passwordbox "Repeat p
 dialog --title "$title" --yes-label "I UNDERSTAND" --no-label "Cancel" --yesno \
 "THIS WILL ERASE $DISK\nFirmware: $FIRMWARE\nFS: $FS\nBootloader: $BOOTLOADER\nDesktop: $PROFILE\nEncrypt: $ENCRYPT\nSwap: $SWAP_KIND ${SWAP_MIB}MiB\nHostname: $HOSTNAME / User: $USERNAME\n\nProceed?" 18 70 || exit 1
 
-# ---------------- Snake HUD (start IMMEDIATELY) ----------------
 emit_status 1 "Launching Snake & logs…"
 
 cat > "$TMPDIR/snake.py" <<'PY'
@@ -123,7 +116,6 @@ tmux new-session -d -s archinst "tail -f $LOGFILE"
 STATUS_JSON="$STATUS_JSON" tmux split-window -h -t archinst "python $TMPDIR/snake.py"
 tmux select-pane -t archinst:0.0
 
-# ---------------- main install runs IN BACKGROUND ----------------
 BEST_EFFORT="${BEST_EFFORT}"
 
 install_main() {
@@ -213,11 +205,9 @@ install_main() {
   emit_status 55 "Generating fstab"
   genfstab -U /mnt >> /mnt/etc/fstab
 
-  # ---- chroot config ----
   emit_status 60 "Entering chroot…"
   ROOT_UUID=$(blkid -s UUID -o value "$P_ROOT")
 
-  # Export all needed vars into chroot env
   export HOSTNAME USERNAME PASS_USER PASS_ROOT TIMEZONE PROFILE ENCRYPT BOOTLOADER FS FIRMWARE DISK SWAP_MIB ROOT_UUID
   export P_EFI P_ROOT
 
@@ -308,8 +298,6 @@ CHROOT
   emit_status 100 "Done! You can reboot."
 }
 
-# Launch installer in the background so we can ATTACH tmux now
 install_main & disown
 
-# Drop the user straight into Snake+logs
 exec tmux attach -t archinst
