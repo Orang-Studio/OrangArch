@@ -97,5 +97,4 @@ tmux attach -t archinst
 
 ## License
 
-[MIT License](./LICENSE) — do whatever you want, but no warranty is provided.
-
+[GPLv3 License](./LICENSE) — copyleft, no warranty is provided.
